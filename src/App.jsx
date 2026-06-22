@@ -13,8 +13,7 @@ import Services from './pages/services/Services';
 import JobStrategy from './pages/services/JobStrategy';
 
 import Testimonials from './pages/Testimonials'
-import Apply from './pages/portal/Apply';
-import ThankYou from './pages/portal/ThankYou';
+
 import About from './pages/About'
 import Privacy from './pages/Privacy';
 import Terms from './pages/Terms';
@@ -41,8 +40,8 @@ export default function App() {
 
             <Route path="/services/:id" element={<JobStrategy />} /> 
             
-            <Route path="/apply" element={<Apply />} />
-            <Route path="/onboarding-success" element={<ThankYou />} />
+
+   
           </Routes>
         </main>
         <Footer />
