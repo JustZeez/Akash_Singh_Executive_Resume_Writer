@@ -2,7 +2,7 @@
 
 // ─── YOUR CLOUDINARY CREDENTIALS ───
 // Replace with your actual values from Cloudinary dashboard
-const CLOUDINARY_CLOUD_NAME = "dezcs9a4y";        // Your cloud name
+const CLOUDINARY_CLOUD_NAME = "dezcsi9a4y";        // Your cloud name
 const CLOUDINARY_UPLOAD_PRESET = "akash_uploads"; // Your unsigned upload preset
 
 /**
