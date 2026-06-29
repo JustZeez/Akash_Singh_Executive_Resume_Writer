@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, User, Phone, MessageCircle, Send, CheckCircle } from 'lucide-react';
+import { Mail, User, Phone, MessageCircle, Send, CheckCircle, Loader2 } from 'lucide-react';
 
 export default function Contact() {
   const [formData, setFormData] = useState({
@@ -10,6 +10,7 @@ export default function Contact() {
     message: '',
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
   const handleChange = (e) => {
@@ -18,14 +19,54 @@ export default function Contact() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // In production, send this to your backend or email service
-    console.log('Form submitted:', formData);
+    setIsSubmitting(true);
+
+    // ─── Build WhatsApp Message ───
+    const phoneNumber = '918824893507'; // Akash's WhatsApp number (without +)
+    
+    const message = `*New Contact Form Inquiry* 🎯
+
+━━━━━━━━━━━━━━━━━━━━━
+*📋 CLIENT DETAILS*
+━━━━━━━━━━━━━━━━━━━━━
+
+*👤 Name:* ${formData.name || 'Not provided'}
+*✉️ Email:* ${formData.email || 'Not provided'}
+*📞 Phone:* ${formData.phone || 'Not provided'}
+
+━━━━━━━━━━━━━━━━━━━━━
+*📌 SERVICE REQUEST*
+━━━━━━━━━━━━━━━━━━━━━
+
+*Service:* ${formData.service || 'Not specified'}
+
+━━━━━━━━━━━━━━━━━━━━━
+*💬 MESSAGE*
+━━━━━━━━━━━━━━━━━━━━━
+
+${formData.message || 'No message provided'}
+
+━━━━━━━━━━━━━━━━━━━━━
+*Sent via:* Akash Singh Website
+*Date:* ${new Date().toLocaleString()}
+━━━━━━━━━━━━━━━━━━━━━`;
+
+    // ─── Encode for URL ───
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+
+    // ─── Open WhatsApp ───
+    window.open(whatsappUrl, '_blank');
+
+    // ─── Show success state ───
+    setIsSubmitting(false);
     setIsSubmitted(true);
-    // Reset form after 3 seconds
+
+    // ─── Reset form after 5 seconds ───
     setTimeout(() => {
       setFormData({ name: '', email: '', phone: '', service: '', message: '' });
       setIsSubmitted(false);
-    }, 3000);
+    }, 5000);
   };
 
   const services = [
@@ -48,8 +89,7 @@ export default function Contact() {
             Engineer Your <span className="italic text-accent">Strategic Advantage</span>
           </h1>
           <p className="text-muted mt-4 max-w-xl mx-auto leading-relaxed">
-            Ready to transform your executive career? Share your goals, and I'll get back to you
-            within 24 hours with a tailored strategy.
+            Ready to transform your executive career? Fill in the form and connect with me directly on WhatsApp.
           </p>
           <div className="w-12 h-1 bg-secondary mx-auto mt-4 rounded-full"></div>
         </div>
@@ -61,10 +101,13 @@ export default function Contact() {
               <div className="flex justify-center">
                 <CheckCircle size={64} className="text-secondary" />
               </div>
-              <h3 className="text-2xl font-serif font-bold text-primary">Message Sent!</h3>
-              <p className="text-muted">
-                Thank you for reaching out. I'll review your message and respond within 24 hours.
+              <h3 className="text-2xl font-serif font-bold text-primary">WhatsApp Opening... 💬</h3>
+              <p className="text-muted max-w-md mx-auto">
+                Your message has been prepared. Please review and send it on WhatsApp to connect with Akash directly.
               </p>
+              <div className="inline-flex items-center gap-2 bg-green-50 px-6 py-3 rounded-full border border-green-200">
+                <span className="text-green-600 text-sm font-medium">📱 If WhatsApp didn't open, <a href="https://wa.me/918824893507" target="_blank" rel="noopener noreferrer" className="text-secondary underline">click here</a></span>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -112,7 +155,7 @@ export default function Contact() {
                 {/* Phone */}
                 <div>
                   <label htmlFor="phone" className="block text-xs font-semibold uppercase tracking-wider text-primary mb-2">
-                    Phone Number
+                    Phone Number <span className="text-secondary">*</span>
                   </label>
                   <div className="relative">
                     <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted/50" />
@@ -122,8 +165,9 @@ export default function Contact() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
+                      required
                       className="w-full pl-12 pr-4 py-3 bg-cream/50 border border-secondary/20 rounded-xl focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none text-primary placeholder-muted/60"
-                      placeholder="+1 (555) 000-0000"
+                      placeholder="+91 88248 93507"
                     />
                   </div>
                 </div>
@@ -171,18 +215,28 @@ export default function Contact() {
                 </div>
               </div>
 
-              {/* Submit */}
+              {/* Submit Button */}
               <div className="pt-4">
                 <button
                   type="submit"
-                  className="w-full md:w-auto bg-secondary text-white hover:bg-primary px-10 py-4 rounded-full font-bold uppercase tracking-wider text-sm transition-all duration-300 shadow-lg shadow-secondary/30 flex items-center justify-center gap-2 group"
+                  disabled={isSubmitting}
+                  className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-10 py-4 rounded-full font-bold uppercase tracking-wider text-sm transition-all duration-300 shadow-lg shadow-green-600/30 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Send size={18} className="group-hover:translate-x-1 transition-transform" />
-                  Send Message
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> Opening WhatsApp...
+                    </>
+                  ) : (
+                    <>
+                      <MessageCircle size={18} className="group-hover:scale-110 transition-transform" />
+                      Send via WhatsApp
+                    </>
+                  )}
                 </button>
-                <p className="text-muted/60 text-xs mt-4">
-                  By submitting this form, you agree to our{' '}
-                  <a href="/privacy" className="text-secondary hover:underline">Privacy Policy</a>.
+
+                <p className="text-muted/60 text-xs mt-4 flex items-center gap-2">
+                  <span className="text-green-600">💬</span>
+                  You'll be redirected to WhatsApp to review and send your message.
                 </p>
               </div>
             </form>
@@ -209,7 +263,7 @@ export default function Contact() {
             <div className="text-secondary text-2xl mb-2">💬</div>
             <p className="text-primary font-bold text-sm">WhatsApp</p>
             <a href="https://wa.me/918824893507" target="_blank" rel="noopener noreferrer" className="text-muted text-sm hover:text-secondary transition-colors">
-              Chat Now
+              Chat Directly
             </a>
           </div>
         </div>

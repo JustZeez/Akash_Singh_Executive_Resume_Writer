@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Award,
   Shield,
@@ -33,8 +33,16 @@ import {
   Upload,
   Eye,
   BarChart,
+  Loader2,
 } from "lucide-react";
 import { useParams, Link } from "react-router-dom";
+import emailjs from "@emailjs/browser";
+import { uploadToCloudinary } from "../../utils/cloudinary";
+
+// ─── EmailJS Credentials (replace with your actual values) ───
+const EMAILJS_SERVICE_ID = "service_p1iabxc";   
+const EMAILJS_TEMPLATE_ID = "template_vf7zed4"; 
+const EMAILJS_PUBLIC_KEY = "yZxltwy7KukzjfKbe"; 
 
 // ─── Custom LinkedIn Icon ───
 const LinkedInIcon = ({ size = 40, className = "" }) => (
@@ -730,12 +738,62 @@ Whether it's about career transitions, interview strategies, or industry trends 
   },
 };
 
+// ─── Main Component ───
 export default function JobStrategy() {
   const { id } = useParams();
   const service = serviceDetails[id];
+  const formRef = useRef();
 
-  // ─── Form Fields based on service type ───
-  const getFormFields = (type) => {
+  // ─── Form State ───
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    question: "",
+    targetTitles: "",
+    countryFocus: "",
+    secondaryRoles: "",
+    businessModels: "",
+    targetIndustries: "",
+    linkedinUrl: "",
+    goals: "",
+    roadblocks: "",
+    portfolio: "",
+    additionalDetails: "",
+    targetCountry: "",
+    targetJobProfile: "",
+    industriesOfFocus: "",
+    panelNames: "",
+    companyName: "",
+    jobId: "",
+    coverLetter: "",
+    topCompanies: "",
+    noticePeriod: "",
+    currentComp: "",
+    expectedComp: "",
+    visaStatus: "",
+    confidentiality: "",
+    orgSize: "",
+    nonNegotiables: "",
+    relocation: "",
+    avoidRegions: "",
+    whatsappPref: false,
+    termsAccepted: false,
+  });
+
+  // ─── File States ───
+  const [resumeFile, setResumeFile] = useState(null);
+  const [jdFile, setJdFile] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+
+  // ─── Upload & Submit States ───
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  // ─── Form Fields ───
+   const getFormFields = (type) => {
     switch (type) {
       case "executive":
         return [
@@ -826,22 +884,9 @@ export default function JobStrategy() {
         ];
     }
   };
-
   const formFields = getFormFields(service?.formType || "default");
 
-  // ─── Form State ───
-  const initialFormState = {};
-  formFields.forEach((field) => {
-    initialFormState[field.name] = "";
-  });
-  initialFormState.termsAccepted = false;
-  initialFormState.whatsappPref = false;
-
-  const [formData, setFormData] = useState(initialFormState);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
-
-  // Redirect if service not found
+  // ─── Redirect if service not found ───
   if (!service) {
     return (
       <div className="min-h-screen pt-20 bg-cream flex items-center justify-center">
@@ -855,6 +900,7 @@ export default function JobStrategy() {
     );
   }
 
+  // ─── Handlers ───
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
@@ -863,61 +909,165 @@ export default function JobStrategy() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleFileChange = (e, setter) => {
+    const file = e.target.files[0];
+    if (file) {
+      setter(file);
+    }
+  };
+
+  // ─── Submit Handler ───
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.termsAccepted) return;
 
-    setIsSubmitting(true);
+    if (!formData.termsAccepted) {
+      setSubmitError("Please accept the Terms & Conditions.");
+      return;
+    }
 
-    // Build comprehensive email body with all details
-    const subject = `Service Inquiry: ${service.title}`;
-    let body = `
-      ─── SERVICE INQUIRY ───
-      
-      Service: ${service.title}
-      Service ID: ${service.id}
-      Price: ${service.price}
-      
-      ─── CLIENT RESPONSES ───
-    `;
+    setIsUploading(true);
+    setSubmitError(null);
 
-    formFields.forEach((field) => {
-      const value = formData[field.name] || "Not specified";
-      const label = field.label;
-      body += `\n${label}: ${value}`;
-    });
+    try {
+      // ─── 1. Upload Files to Cloudinary ───
+      let resumeUrl = null;
+      let jdUrl = null;
+      let photoUrl = null;
 
-    // Add file upload info (since we can't attach files via mailto)
-    body += `
-      
-      ─── FILE UPLOADS ───
-      Resume/CV: User will attach separately via email reply
-      JD File: User will attach separately via email reply
-      Photo: User will attach separately via email reply
-      
-      ─── COMMUNICATION PREFERENCE ───
-      WhatsApp Preference: ${formData.whatsappPref ? "✅ YES (Reply via WhatsApp)" : "❌ NO (Email preferred)"}
-      ${formData.whatsappPref ? `WhatsApp Number: ${formData.phone || "Not provided"}` : ""}
-      
-      ─── SERVICE REQUEST ───
-      This inquiry was submitted via the service detail page for ${service.title}.
-      
-      Please respond to this client at: ${formData.email || "email not provided"}
-      Client Name: ${formData.name || "Not provided"}
-    `;
+      if (resumeFile) {
+        resumeUrl = await uploadToCloudinary(resumeFile);
+      }
+      if (jdFile) {
+        jdUrl = await uploadToCloudinary(jdFile);
+      }
+      if (photoFile) {
+        photoUrl = await uploadToCloudinary(photoFile);
+      }
 
-    window.location.href = `mailto:akash.ranawat007@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // ─── 2. Prepare EmailJS Payload ───
+      const templateParams = {
+        // Service info
+        service_title: service.title,
+        service_tag: service.tag,
+        service_price: service.price,
 
-    setIsSubmitting(false);
-    setSubmitSuccess(true);
+        // Client responses – all fields from the form
+        name: formData.name || "Not provided",
+        email: formData.email || "Not provided",
+        phone: formData.phone || "Not provided",
+        question: formData.question || "Not provided",
+        targetTitles: formData.targetTitles || "Not provided",
+        countryFocus: formData.countryFocus || "Not provided",
+        secondaryRoles: formData.secondaryRoles || "Not provided",
+        businessModels: formData.businessModels || "Not provided",
+        targetIndustries: formData.targetIndustries || "Not provided",
+        linkedinUrl: formData.linkedinUrl || "Not provided",
+        goals: formData.goals || "Not provided",
+        roadblocks: formData.roadblocks || "Not provided",
+        portfolio: formData.portfolio || "Not provided",
+        additionalDetails: formData.additionalDetails || "Not provided",
+        targetCountry: formData.targetCountry || "Not provided",
+        targetJobProfile: formData.targetJobProfile || "Not provided",
+        industriesOfFocus: formData.industriesOfFocus || "Not provided",
+        panelNames: formData.panelNames || "Not provided",
+        companyName: formData.companyName || "Not provided",
+        jobId: formData.jobId || "Not provided",
+        coverLetter: formData.coverLetter || "Not provided",
+        topCompanies: formData.topCompanies || "Not provided",
+        noticePeriod: formData.noticePeriod || "Not provided",
+        currentComp: formData.currentComp || "Not provided",
+        expectedComp: formData.expectedComp || "Not provided",
+        visaStatus: formData.visaStatus || "Not provided",
+        confidentiality: formData.confidentiality || "Not provided",
+        orgSize: formData.orgSize || "Not provided",
+        nonNegotiables: formData.nonNegotiables || "Not provided",
+        relocation: formData.relocation || "Not provided",
+        avoidRegions: formData.avoidRegions || "Not provided",
 
-    // Reset success after 10 seconds
-    setTimeout(() => setSubmitSuccess(false), 10000);
+        // File URLs
+        resumeUrl: resumeUrl || "No file uploaded",
+        jdUrl: jdUrl || "No file uploaded",
+        photoUrl: photoUrl || "No file uploaded",
+
+        // Preferences
+        whatsappPref: formData.whatsappPref,
+        date: new Date().toLocaleString(),
+      };
+
+      // ─── 3. Send Email via EmailJS ───
+      setIsUploading(false);
+      setIsSubmitting(true);
+
+      await emailjs.send(
+        EMAILJS_SERVICE_ID,
+        EMAILJS_TEMPLATE_ID,
+        templateParams,
+        EMAILJS_PUBLIC_KEY
+      );
+
+      // ─── 4. Success ───
+      setSubmitSuccess(true);
+
+      // Reset form and file states
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        question: "",
+        targetTitles: "",
+        countryFocus: "",
+        secondaryRoles: "",
+        businessModels: "",
+        targetIndustries: "",
+        linkedinUrl: "",
+        goals: "",
+        roadblocks: "",
+        portfolio: "",
+        additionalDetails: "",
+        targetCountry: "",
+        targetJobProfile: "",
+        industriesOfFocus: "",
+        panelNames: "",
+        companyName: "",
+        jobId: "",
+        coverLetter: "",
+        topCompanies: "",
+        noticePeriod: "",
+        currentComp: "",
+        expectedComp: "",
+        visaStatus: "",
+        confidentiality: "",
+        orgSize: "",
+        nonNegotiables: "",
+        relocation: "",
+        avoidRegions: "",
+        whatsappPref: false,
+        termsAccepted: false,
+      });
+      setResumeFile(null);
+      setJdFile(null);
+      setPhotoFile(null);
+
+      // Reset file inputs
+      const fileInputs = document.querySelectorAll('input[type="file"]');
+      fileInputs.forEach((input) => (input.value = ""));
+
+      // Reset error
+      setSubmitError(null);
+
+      // Auto-hide success after 10 seconds
+      setTimeout(() => setSubmitSuccess(false), 10000);
+
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      setSubmitError("Something went wrong. Please try again or contact us directly.");
+    } finally {
+      setIsUploading(false);
+      setIsSubmitting(false);
+    }
   };
 
   const isFormValid = formData.name && formData.email && formData.termsAccepted;
-
-  // Get the user's first name for the success message
   const firstName = formData.name ? formData.name.split(" ")[0] : "there";
 
   return (
@@ -1214,7 +1364,7 @@ export default function JobStrategy() {
                 <p className="text-xs text-muted mt-4">If you don't hear back, please check your spam folder.</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
                 {formFields.map((field) => {
                   const Icon = field.icon;
                   const value = formData[field.name] || "";
@@ -1278,6 +1428,7 @@ export default function JobStrategy() {
                         type="file"
                         name="resume"
                         accept=".pdf,.doc,.docx"
+                        onChange={(e) => handleFileChange(e, setResumeFile)}
                         required
                         className="w-full pl-12 pr-4 py-3 bg-cream/50 border border-secondary/20 rounded-xl focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none text-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-primary"
                       />
@@ -1286,7 +1437,7 @@ export default function JobStrategy() {
                   </div>
                 )}
 
-                {/* ─── JD FILE UPLOAD – Now added to Interview form ─── */}
+                {/* JD File Upload – for Interview form */}
                 {(service.formType === "interview" || service.formType === "default" || service.formType === "executive") && (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-primary mb-2">
@@ -1298,6 +1449,7 @@ export default function JobStrategy() {
                         type="file"
                         name="jdFile"
                         accept=".pdf,.doc,.docx,.txt"
+                        onChange={(e) => handleFileChange(e, setJdFile)}
                         required={service.formType === "interview"}
                         className="w-full pl-12 pr-4 py-3 bg-cream/50 border border-secondary/20 rounded-xl focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none text-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-primary"
                       />
@@ -1318,6 +1470,7 @@ export default function JobStrategy() {
                         type="file"
                         name="resume"
                         accept=".pdf,.doc,.docx"
+                        onChange={(e) => handleFileChange(e, setResumeFile)}
                         required
                         className="w-full pl-12 pr-4 py-3 bg-cream/50 border border-secondary/20 rounded-xl focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none text-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-primary"
                       />
@@ -1337,6 +1490,7 @@ export default function JobStrategy() {
                         type="file"
                         name="photo"
                         accept="image/*"
+                        onChange={(e) => handleFileChange(e, setPhotoFile)}
                         className="w-full pl-12 pr-4 py-3 bg-cream/50 border border-secondary/20 rounded-xl focus:border-secondary focus:ring-2 focus:ring-secondary/20 transition-all outline-none text-primary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-primary"
                       />
                     </div>
@@ -1357,7 +1511,6 @@ export default function JobStrategy() {
                     <label className="text-sm text-primary/80 cursor-pointer">
                       I prefer to receive replies via WhatsApp <span className="text-xs text-muted">(using the phone number provided)</span>
                     </label>
-                    {/* ─── CONDITIONAL WHATSAPP MESSAGE ─── */}
                     {formData.whatsappPref && (
                       <p className="text-sm text-secondary font-medium mt-2 animate-fade-in-up">
                         💬 I would love to receive my response on WhatsApp.
@@ -1392,16 +1545,20 @@ export default function JobStrategy() {
                 {/* ─── SUBMIT BUTTON ─── */}
                 <button
                   type="submit"
-                  disabled={!isFormValid || isSubmitting}
+                  disabled={!isFormValid || isUploading || isSubmitting}
                   className={`w-full md:w-auto px-12 py-4 rounded-full font-bold uppercase tracking-wider text-sm flex items-center justify-center gap-3 transition-all ${
-                    isFormValid
+                    isFormValid && !isUploading && !isSubmitting
                       ? "bg-secondary text-white hover:bg-primary shadow-lg hover:shadow-xl cursor-pointer"
                       : "bg-muted/30 text-muted cursor-not-allowed"
                   }`}
                 >
-                  {isSubmitting ? (
+                  {isUploading ? (
                     <>
-                      <span className="animate-spin">⏳</span> Sending...
+                      <Loader2 size={18} className="animate-spin" /> Uploading Files...
+                    </>
+                  ) : isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" /> Sending...
                     </>
                   ) : (
                     <>
@@ -1409,6 +1566,13 @@ export default function JobStrategy() {
                     </>
                   )}
                 </button>
+
+                {/* Error Message */}
+                {submitError && (
+                  <p className="text-red-500 text-sm text-center mt-4">
+                    ❌ {submitError}
+                  </p>
+                )}
 
                 <p className="text-xs text-muted/70 mt-4">
                   By submitting this form, you agree that your data will be used to respond to your inquiry.
